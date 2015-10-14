@@ -51,7 +51,6 @@ namespace Newtonsoft.Json.Serialization
         private JsonContract _rootContract;
         private int _rootLevel;
         private readonly List<object> _serializeStack = new List<object>();
-        private JsonSerializerProxy _internalSerializer;
 
         public JsonSerializerInternalWriter(JsonSerializer serializer)
             : base(serializer)
@@ -70,7 +69,14 @@ namespace Newtonsoft.Json.Serialization
 
             try
             {
-                SerializeValue(jsonWriter, value, contract, null, null, null);
+                if (ShouldWriteReference(value, null, contract, null, null))
+                {
+                    WriteReference(jsonWriter, value);
+                }
+                else
+                {
+                    SerializeValue(jsonWriter, value, contract, null, null, null);
+                }
             }
             catch (Exception ex)
             {
@@ -97,10 +103,10 @@ namespace Newtonsoft.Json.Serialization
 
         private JsonSerializerProxy GetInternalSerializer()
         {
-            if (_internalSerializer == null)
-                _internalSerializer = new JsonSerializerProxy(this);
+            if (InternalSerializer == null)
+                InternalSerializer = new JsonSerializerProxy(this);
 
-            return _internalSerializer;
+            return InternalSerializer;
         }
 
         private JsonContract GetContractSafe(object value)
@@ -182,7 +188,7 @@ namespace Newtonsoft.Json.Serialization
                     SerializeDynamic(writer, (IDynamicMetaObjectProvider)value, (JsonDynamicContract)valueContract, member, containerContract, containerProperty);
                     break;
 #endif
-#if !(NETFX_CORE || PORTABLE40 || PORTABLE)
+#if !(DOTNET || PORTABLE40 || PORTABLE)
                 case JsonContractType.Serializable:
                     SerializeISerializable(writer, (ISerializable)value, (JsonISerializableContract)valueContract, member, containerContract, containerProperty);
                     break;
@@ -265,7 +271,11 @@ namespace Newtonsoft.Json.Serialization
             if (referenceLoopHandling == null && containerContract != null)
                 referenceLoopHandling = containerContract.ItemReferenceLoopHandling;
 
-            if (_serializeStack.IndexOf(value) != -1)
+            bool exists = (Serializer._equalityComparer != null)
+                ? _serializeStack.Contains(value, Serializer._equalityComparer)
+                : _serializeStack.Contains(value);
+
+            if (exists)
             {
                 string message = "Self referencing loop detected";
                 if (property != null)
@@ -321,7 +331,7 @@ namespace Newtonsoft.Json.Serialization
 
         internal static bool TryConvertToString(object value, Type type, out string s)
         {
-#if !(NETFX_CORE || PORTABLE40 || PORTABLE)
+#if !(DOTNET || PORTABLE40 || PORTABLE)
             TypeConverter converter = ConvertUtils.GetConverter(type);
 
             // use the objectType's TypeConverter if it has one and can convert to a string
@@ -337,12 +347,12 @@ namespace Newtonsoft.Json.Serialization
             }
 #endif
 
-#if NETFX_CORE || PORTABLE
-      if (value is Guid || value is Uri || value is TimeSpan)
-      {
-        s = value.ToString();
-        return true;
-      }
+#if (DOTNET || PORTABLE)
+            if (value is Guid || value is Uri || value is TimeSpan)
+            {
+                s = value.ToString();
+                return true;
+            }
 #endif
 
             if (value is Type)
@@ -657,7 +667,7 @@ namespace Newtonsoft.Json.Serialization
 
             writer.WriteStartArray();
 
-            for (int i = 0; i < values.GetLength(dimension); i++)
+            for (int i = values.GetLowerBound(dimension); i <= values.GetUpperBound(dimension); i++)
             {
                 newIndices[dimension] = i;
                 bool isTopLevel = (newIndices.Length == values.Rank);
@@ -729,7 +739,7 @@ namespace Newtonsoft.Json.Serialization
             return writeMetadataObject;
         }
 
-#if !(NETFX_CORE || PORTABLE40 || PORTABLE)
+#if !(DOTNET || PORTABLE40 || PORTABLE)
 #if !(NET20 || NET35)
         [SecuritySafeCritical]
 #endif

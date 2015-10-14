@@ -26,7 +26,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Net;
 using System.Runtime.CompilerServices;
 using Newtonsoft.Json.Utilities;
 
@@ -43,22 +42,17 @@ namespace Newtonsoft.Json.Serialization
 
             int IEqualityComparer<object>.GetHashCode(object obj)
             {
-#if !(NETFX_CORE)
                 // put objects in a bucket based on their reference
                 return RuntimeHelpers.GetHashCode(obj);
-#else
-    // put all objects in the same bucket so ReferenceEquals is called on all
-        return -1;
-#endif
             }
         }
 
         private ErrorContext _currentErrorContext;
         private BidirectionalDictionary<string, object> _mappings;
-        private bool _serializing;
 
         internal readonly JsonSerializer Serializer;
         internal readonly ITraceWriter TraceWriter;
+        protected JsonSerializerProxy InternalSerializer;
 
         protected JsonSerializerInternalBase(JsonSerializer serializer)
         {
@@ -66,9 +60,6 @@ namespace Newtonsoft.Json.Serialization
 
             Serializer = serializer;
             TraceWriter = serializer.TraceWriter;
-
-            // kind of a hack but meh. might clean this up later
-            _serializing = (GetType() == typeof(JsonSerializerInternalWriter));
         }
 
         internal BidirectionalDictionary<string, object> DefaultReferenceMappings
@@ -116,7 +107,8 @@ namespace Newtonsoft.Json.Serialization
                 // only write error once
                 errorContext.Traced = true;
 
-                string message = (_serializing) ? "Error serializing" : "Error deserializing";
+                // kind of a hack but meh. might clean this up later
+                string message = (GetType() == typeof(JsonSerializerInternalWriter)) ? "Error serializing" : "Error deserializing";
                 if (contract != null)
                     message += " " + contract.UnderlyingType;
                 message += ". " + ex.Message;

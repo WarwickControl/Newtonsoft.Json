@@ -54,6 +54,54 @@ namespace Newtonsoft.Json.Tests.Linq
     [TestFixture]
     public class LinqToJsonTest : TestFixtureBase
     {
+        public class TestClass_ULong
+        {
+            public ulong Value { get; set; }
+        }
+
+        [Test]
+        public void FromObject_ULongMaxValue()
+        {
+            TestClass_ULong instance = new TestClass_ULong { Value = ulong.MaxValue };
+            JObject output = JObject.FromObject(instance);
+
+            StringAssert.AreEqual(@"{
+  ""Value"": 18446744073709551615
+}", output.ToString());
+        }
+
+        public class TestClass_Byte
+        {
+            public byte Value { get; set; }
+        }
+
+        [Test]
+        public void FromObject_ByteMaxValue()
+        {
+            TestClass_Byte instance = new TestClass_Byte { Value = byte.MaxValue };
+            JObject output = JObject.FromObject(instance);
+
+            StringAssert.AreEqual(@"{
+  ""Value"": 255
+}", output.ToString());
+        }
+
+        [Test]
+        public void ToObject_Base64AndGuid()
+        {
+            JObject o = JObject.Parse("{'responseArray':'AAAAAAAAAAAAAAAAAAAAAAAAAAABAAAA'}");
+            byte[] data = o["responseArray"].ToObject<byte[]>();
+            byte[] expected = Convert.FromBase64String("AAAAAAAAAAAAAAAAAAAAAAAAAAABAAAA");
+
+            CollectionAssert.AreEqual(expected, data);
+
+            o = JObject.Parse("{'responseArray':'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAABAAAA'}");
+            data = o["responseArray"].ToObject<byte[]>();
+            expected = new Guid("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAABAAAA").ToByteArray();
+
+            CollectionAssert.AreEqual(expected, data);
+        }
+
         [Test]
         public void IncompleteContainers()
         {
@@ -123,11 +171,32 @@ namespace Newtonsoft.Json.Tests.Linq
 ]");
 
             JsonTextReader jsonReader = new JsonTextReader(textReader);
-            JArray a = (JArray)JToken.ReadFrom(jsonReader);
+            JArray a = (JArray)JToken.ReadFrom(jsonReader, new JsonLoadSettings
+            {
+                CommentHandling = CommentHandling.Load
+            });
 
             Assert.AreEqual(4, a.Count);
             Assert.AreEqual(JTokenType.Comment, a[0].Type);
             Assert.AreEqual(" hi", ((JValue)a[0]).Value);
+        }
+
+        [Test]
+        public void CommentsAndReadFrom_IgnoreComments()
+        {
+            StringReader textReader = new StringReader(@"[
+    // hi
+    1,
+    2,
+    3
+]");
+
+            JsonTextReader jsonReader = new JsonTextReader(textReader);
+            JArray a = (JArray)JToken.ReadFrom(jsonReader);
+
+            Assert.AreEqual(3, a.Count);
+            Assert.AreEqual(JTokenType.Integer, a[0].Type);
+            Assert.AreEqual(1, ((JValue)a[0]).Value);
         }
 
         [Test]
@@ -142,11 +211,39 @@ namespace Newtonsoft.Json.Tests.Linq
 ]");
 
             JsonTextReader jsonReader = new JsonTextReader(textReader);
-            JValue v = (JValue)JToken.ReadFrom(jsonReader);
+            JValue v = (JValue)JToken.ReadFrom(jsonReader, new JsonLoadSettings
+            {
+                CommentHandling = CommentHandling.Load
+            });
 
             Assert.AreEqual(JTokenType.Comment, v.Type);
 
             IJsonLineInfo lineInfo = v;
+            Assert.AreEqual(true, lineInfo.HasLineInfo());
+            Assert.AreEqual(3, lineInfo.LineNumber);
+            Assert.AreEqual(0, lineInfo.LinePosition);
+        }
+
+        [Test]
+        public void StartingCommentAndReadFrom_IgnoreComments()
+        {
+            StringReader textReader = new StringReader(@"
+// hi
+[
+    1,
+    2,
+    3
+]");
+
+            JsonTextReader jsonReader = new JsonTextReader(textReader);
+            JArray a = (JArray)JToken.ReadFrom(jsonReader, new JsonLoadSettings
+            {
+                CommentHandling = CommentHandling.Ignore
+            });
+
+            Assert.AreEqual(JTokenType.Array, a.Type);
+
+            IJsonLineInfo lineInfo = a;
             Assert.AreEqual(true, lineInfo.HasLineInfo());
             Assert.AreEqual(3, lineInfo.LineNumber);
             Assert.AreEqual(1, lineInfo.LinePosition);
@@ -171,7 +268,7 @@ undefined
             IJsonLineInfo lineInfo = v;
             Assert.AreEqual(true, lineInfo.HasLineInfo());
             Assert.AreEqual(2, lineInfo.LineNumber);
-            Assert.AreEqual(10, lineInfo.LinePosition);
+            Assert.AreEqual(9, lineInfo.LinePosition);
         }
 
         [Test]
@@ -223,7 +320,7 @@ undefined
 
             JToken v1 = o["frameworks"]["dnxcore50"]["dependencies"]["System.Xml.ReaderWriter"]["source"];
 
-            Assert.AreEqual("frameworks.dnxcore50.dependencies.['System.Xml.ReaderWriter'].source", v1.Path);
+            Assert.AreEqual("frameworks.dnxcore50.dependencies['System.Xml.ReaderWriter'].source", v1.Path);
 
             JToken v2 = o.SelectToken(v1.Path);
 
@@ -1187,7 +1284,7 @@ keyword such as type of business.""
   ""NullableGuid"": ""9e9f3adf-e017-4f72-91e0-617ebe85967d"",
   ""TimeSpan"": ""1.00:00:00"",
   ""NullableTimeSpan"": ""01:00:00"",
-  ""Uri"": ""http://testuri.com/""
+  ""Uri"": ""http://testuri.com""
 }", o.ToString());
 
             UriGuidTimeSpanTestClass c2 = o.ToObject<UriGuidTimeSpanTestClass>();
@@ -1196,6 +1293,10 @@ keyword such as type of business.""
             Assert.AreEqual(c1.TimeSpan, c2.TimeSpan);
             Assert.AreEqual(c1.NullableTimeSpan, c2.NullableTimeSpan);
             Assert.AreEqual(c1.Uri, c2.Uri);
+
+            string j = JsonConvert.SerializeObject(c1, Formatting.Indented);
+
+            StringAssert.AreEqual(j, o.ToString());
         }
 
         [Test]

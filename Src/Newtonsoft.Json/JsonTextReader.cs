@@ -104,7 +104,7 @@ namespace Newtonsoft.Json
         private void OnNewLine(int pos)
         {
             _lineNumber++;
-            _lineStartPos = pos - 1;
+            _lineStartPos = pos;
         }
 
         private void ParseString(char quote)
@@ -117,10 +117,15 @@ namespace Newtonsoft.Json
 
             if (_readType == ReadType.ReadAsBytes)
             {
+                Guid g;
                 byte[] data;
                 if (_stringReference.Length == 0)
                 {
                     data = new byte[0];
+                }
+                else if (_stringReference.Length == 36 && ConvertUtils.TryConvertGuid(_stringReference.ToString(), out g))
+                {
+                    data = g.ToByteArray();
                 }
                 else
                 {
@@ -1619,11 +1624,13 @@ namespace Newtonsoft.Json
             base.Close();
 
             if (CloseInput && _reader != null)
-#if !(NETFX_CORE || PORTABLE40 || PORTABLE)
+            {
+#if !(DOTNET || PORTABLE40 || PORTABLE)
                 _reader.Close();
 #else
                 _reader.Dispose();
 #endif
+            }
 
             if (_buffer != null)
                 _buffer.Clear();
@@ -1650,7 +1657,7 @@ namespace Newtonsoft.Json
         {
             get
             {
-                if (CurrentState == State.Start && LinePosition == 0)
+                if (CurrentState == State.Start && LinePosition == 0 && TokenType != JsonToken.Comment)
                     return 0;
 
                 return _lineNumber;

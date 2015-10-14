@@ -23,7 +23,7 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 #endregion
 
-#if !(NET35 || NET20 || NETFX_CORE || DNXCORE50)
+#if !(NET35 || NET20 || DNXCORE50)
 using System.Diagnostics;
 using System.Reflection;
 using Microsoft.FSharp.Core;
@@ -101,7 +101,7 @@ namespace Newtonsoft.Json.Tests.Converters
             Stopwatch ts = new Stopwatch();
             ts.Start();
 
-            for (int i = 0; i < 2000; i++)
+            for (int i = 0; i < 100; i++)
             {
                 JsonConvert.SerializeObject(values);
             }
@@ -127,7 +127,7 @@ namespace Newtonsoft.Json.Tests.Converters
             Stopwatch ts = new Stopwatch();
             ts.Start();
 
-            for (int i = 0; i < 2000; i++)
+            for (int i = 0; i < 100; i++)
             {
                 JsonConvert.DeserializeObject<List<Shape>>(json);
             }

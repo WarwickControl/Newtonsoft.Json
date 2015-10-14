@@ -42,7 +42,7 @@ namespace Newtonsoft.Json.Linq
     /// Represents a value in JSON (string, integer, date, etc).
     /// </summary>
     public class JValue : JToken, IEquatable<JValue>, IFormattable, IComparable, IComparable<JValue>
-#if !(NETFX_CORE || PORTABLE)
+#if !PORTABLE
         , IConvertible
 #endif
     {
@@ -563,7 +563,7 @@ namespace Newtonsoft.Json.Linq
         {
             if (value == null)
                 return JTokenType.Null;
-#if !(NETFX_CORE || PORTABLE40 || PORTABLE)
+#if !(DOTNET || PORTABLE40 || PORTABLE)
             else if (value == DBNull.Value)
                 return JTokenType.Null;
 #endif
@@ -676,11 +676,17 @@ namespace Newtonsoft.Json.Linq
                     writer.WriteUndefined();
                     return;
                 case JTokenType.Integer:
+                    if (_value is int)
+                        writer.WriteValue((int)_value);
+                    else if (_value is long)
+                        writer.WriteValue((long)_value);
+                    else if (_value is ulong)
+                        writer.WriteValue((ulong)_value);
 #if !(NET20 || NET35 || PORTABLE40 || PORTABLE)
-                    if (_value is BigInteger)
+                    else if (_value is BigInteger)
                         writer.WriteValue((BigInteger)_value);
-                    else
 #endif
+                    else
                         writer.WriteValue(Convert.ToInt64(_value, CultureInfo.InvariantCulture));
                     return;
                 case JTokenType.Float:
@@ -711,9 +717,11 @@ namespace Newtonsoft.Json.Linq
                     writer.WriteValue((byte[])_value);
                     return;
                 case JTokenType.Guid:
-                case JTokenType.Uri:
                 case JTokenType.TimeSpan:
                     writer.WriteValue((_value != null) ? _value.ToString() : null);
+                    return;
+                case JTokenType.Uri:
+                    writer.WriteValue((_value != null) ? ((Uri) _value).OriginalString : null);
                     return;
             }
 
@@ -959,7 +967,7 @@ namespace Newtonsoft.Json.Linq
             return Compare(_valueType, _value, obj._value);
         }
 
-#if !(NETFX_CORE || PORTABLE)
+#if !PORTABLE
         TypeCode IConvertible.GetTypeCode()
         {
             if (_value == null)
@@ -974,7 +982,12 @@ namespace Newtonsoft.Json.Linq
                 return TypeCode.Object;
 #endif
 
-            return System.Type.GetTypeCode(_value.GetType());
+            IConvertible convertable = _value as IConvertible;
+            
+            if (convertable == null)
+                return TypeCode.Object;
+
+            return convertable.GetTypeCode();
         }
 
         bool IConvertible.ToBoolean(IFormatProvider provider)
@@ -1052,5 +1065,5 @@ namespace Newtonsoft.Json.Linq
             return ToObject(conversionType);
         }
 #endif
-    }
+        }
 }

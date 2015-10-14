@@ -24,6 +24,7 @@
 #endregion
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -57,6 +58,7 @@ namespace Newtonsoft.Json
         internal JsonConverterCollection _converters;
         internal IContractResolver _contractResolver;
         internal ITraceWriter _traceWriter;
+        internal IEqualityComparer _equalityComparer;
         internal SerializationBinder _binder;
         internal StreamingContext _context;
         private IReferenceResolver _referenceResolver;
@@ -118,6 +120,16 @@ namespace Newtonsoft.Json
         {
             get { return _traceWriter; }
             set { _traceWriter = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the equality comparer used by the serializer when comparing references.
+        /// </summary>
+        /// <value>The equality comparer.</value>
+        public virtual IEqualityComparer EqualityComparer
+        {
+            get { return _equalityComparer; }
+            set { _equalityComparer = value; }
         }
 
         /// <summary>
@@ -467,11 +479,13 @@ namespace Newtonsoft.Json
 
         /// <summary>
         /// Creates a new <see cref="JsonSerializer"/> instance.
-        /// The <see cref="JsonSerializer"/> will not use default settings.
+        /// The <see cref="JsonSerializer"/> will not use default settings 
+        /// from <see cref="JsonConvert.DefaultSettings"/>.
         /// </summary>
         /// <returns>
         /// A new <see cref="JsonSerializer"/> instance.
-        /// The <see cref="JsonSerializer"/> will not use default settings.
+        /// The <see cref="JsonSerializer"/> will not use default settings 
+        /// from <see cref="JsonConvert.DefaultSettings"/>.
         /// </returns>
         public static JsonSerializer Create()
         {
@@ -480,12 +494,14 @@ namespace Newtonsoft.Json
 
         /// <summary>
         /// Creates a new <see cref="JsonSerializer"/> instance using the specified <see cref="JsonSerializerSettings"/>.
-        /// The <see cref="JsonSerializer"/> will not use default settings.
+        /// The <see cref="JsonSerializer"/> will not use default settings 
+        /// from <see cref="JsonConvert.DefaultSettings"/>.
         /// </summary>
         /// <param name="settings">The settings to be applied to the <see cref="JsonSerializer"/>.</param>
         /// <returns>
         /// A new <see cref="JsonSerializer"/> instance using the specified <see cref="JsonSerializerSettings"/>.
-        /// The <see cref="JsonSerializer"/> will not use default settings.
+        /// The <see cref="JsonSerializer"/> will not use default settings 
+        /// from <see cref="JsonConvert.DefaultSettings"/>.
         /// </returns>
         public static JsonSerializer Create(JsonSerializerSettings settings)
         {
@@ -499,11 +515,13 @@ namespace Newtonsoft.Json
 
         /// <summary>
         /// Creates a new <see cref="JsonSerializer"/> instance.
-        /// The <see cref="JsonSerializer"/> will use default settings.
+        /// The <see cref="JsonSerializer"/> will use default settings 
+        /// from <see cref="JsonConvert.DefaultSettings"/>.
         /// </summary>
         /// <returns>
         /// A new <see cref="JsonSerializer"/> instance.
-        /// The <see cref="JsonSerializer"/> will use default settings.
+        /// The <see cref="JsonSerializer"/> will use default settings 
+        /// from <see cref="JsonConvert.DefaultSettings"/>.
         /// </returns>
         public static JsonSerializer CreateDefault()
         {
@@ -516,12 +534,14 @@ namespace Newtonsoft.Json
 
         /// <summary>
         /// Creates a new <see cref="JsonSerializer"/> instance using the specified <see cref="JsonSerializerSettings"/>.
-        /// The <see cref="JsonSerializer"/> will use default settings.
+        /// The <see cref="JsonSerializer"/> will use default settings 
+        /// from <see cref="JsonConvert.DefaultSettings"/> as well as the specified <see cref="JsonSerializerSettings"/>.
         /// </summary>
         /// <param name="settings">The settings to be applied to the <see cref="JsonSerializer"/>.</param>
         /// <returns>
         /// A new <see cref="JsonSerializer"/> instance using the specified <see cref="JsonSerializerSettings"/>.
-        /// The <see cref="JsonSerializer"/> will use default settings.
+        /// The <see cref="JsonSerializer"/> will use default settings 
+        /// from <see cref="JsonConvert.DefaultSettings"/> as well as the specified <see cref="JsonSerializerSettings"/>.
         /// </returns>
         public static JsonSerializer CreateDefault(JsonSerializerSettings settings)
         {
@@ -581,6 +601,8 @@ namespace Newtonsoft.Json
                 serializer.ReferenceResolver = settings.ReferenceResolverProvider();
             if (settings.TraceWriter != null)
                 serializer.TraceWriter = settings.TraceWriter;
+            if (settings.EqualityComparer != null)
+                serializer.EqualityComparer = settings.EqualityComparer;
             if (settings.Binder != null)
                 serializer.Binder = settings.Binder;
 

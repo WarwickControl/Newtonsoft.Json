@@ -47,6 +47,101 @@ namespace Newtonsoft.Json.Tests.Serialization
     [TestFixture]
     public class PreserveReferencesHandlingTests : TestFixtureBase
     {
+        public class ContentB
+        {
+            public bool SomeValue { get; set; }
+        }
+
+        [JsonConverter(typeof(ListConverter))]
+        public class ContentA : List<object>
+        {
+            public ContentB B { get; set; }
+
+            public ContentA()
+            {
+                B = new ContentB();
+            }
+        }
+
+        public class ListConverter : JsonConverter
+        {
+            public override bool CanConvert(Type objectType)
+            {
+                return true;
+            }
+
+            public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+            {
+                return new ContentA() { B = serializer.Deserialize<ContentB>(reader) }; // Construct my data back.
+            }
+
+            public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+            {
+                ContentB b = ((ContentA)value).B;
+                serializer.Serialize(writer, b); // My Content.B contains all useful data.
+            }
+        }
+
+        public class Container
+        {
+            public List<ContentA> ListA { get; set; }
+            public List<ContentA> ListB { get; set; }
+
+            public Container()
+            {
+                ListA = new List<ContentA>();
+                ListB = new List<ContentA>();
+            }
+        }
+
+        [Test]
+        public void SerializeReferenceInConvert()
+        {
+            JsonSerializerSettings settings = new JsonSerializerSettings();
+            settings.PreserveReferencesHandling = PreserveReferencesHandling.All;
+            settings.TypeNameHandling = TypeNameHandling.All;
+            settings.Formatting = Formatting.Indented;
+
+            Container c1 = new Container();
+            ContentA content = new ContentA();
+            content.B.SomeValue = true;
+            c1.ListA.Add(content);
+            c1.ListB.Add(content);
+
+            string s = JsonConvert.SerializeObject(c1, settings);
+
+            StringAssert.AreEqual(@"{
+  ""$id"": ""1"",
+  ""$type"": ""Newtonsoft.Json.Tests.Serialization.PreserveReferencesHandlingTests+Container, Newtonsoft.Json.Tests"",
+  ""ListA"": {
+    ""$id"": ""2"",
+    ""$type"": ""System.Collections.Generic.List`1[[Newtonsoft.Json.Tests.Serialization.PreserveReferencesHandlingTests+ContentA, Newtonsoft.Json.Tests]], mscorlib"",
+    ""$values"": [
+      {
+        ""$id"": ""3"",
+        ""$type"": ""Newtonsoft.Json.Tests.Serialization.PreserveReferencesHandlingTests+ContentB, Newtonsoft.Json.Tests"",
+        ""SomeValue"": true
+      }
+    ]
+  },
+  ""ListB"": {
+    ""$id"": ""4"",
+    ""$type"": ""System.Collections.Generic.List`1[[Newtonsoft.Json.Tests.Serialization.PreserveReferencesHandlingTests+ContentA, Newtonsoft.Json.Tests]], mscorlib"",
+    ""$values"": [
+      {
+        ""$ref"": ""3""
+      }
+    ]
+  }
+}", s);
+
+            Container c2 = JsonConvert.DeserializeObject<Container>(s, settings);
+
+            Assert.AreEqual(c2.ListA[0], c2.ListB[0]);
+            Assert.AreEqual(true, c2.ListA[0].B.SomeValue);
+        }
+
+
         public class Parent
         {
             public Child ReadOnlyChild
@@ -334,7 +429,7 @@ namespace Newtonsoft.Json.Tests.Serialization
             {
                 JsonConvert.DeserializeObject<string[][]>(json,
                     new JsonSerializerSettings { PreserveReferencesHandling = PreserveReferencesHandling.All });
-            }, @"Cannot preserve reference to array or readonly list, or list created from a non-default constructor: System.String[][]. Path '$values', line 3, position 15.");
+            }, @"Cannot preserve reference to array or readonly list, or list created from a non-default constructor: System.String[][]. Path '$values', line 3, position 14.");
         }
 
         public class CircularDictionary : Dictionary<string, CircularDictionary>
@@ -384,7 +479,7 @@ namespace Newtonsoft.Json.Tests.Serialization
                         PreserveReferencesHandling = PreserveReferencesHandling.All,
                         MetadataPropertyHandling = MetadataPropertyHandling.Default
                     });
-            }, @"Unexpected end when deserializing object. Path '$id', line 2, position 9.");
+            }, @"Unexpected end when deserializing object. Path '$id', line 2, position 8.");
         }
 
         public class CircularReferenceClassConverter : JsonConverter
@@ -1149,7 +1244,7 @@ namespace Newtonsoft.Json.Tests.Serialization
             ExceptionAssert.Throws<JsonSerializationException>(() => JsonConvert.DeserializeObject<PropertyItemIsReferenceObject>(json, new JsonSerializerSettings
             {
                 MetadataPropertyHandling = MetadataPropertyHandling.Default
-            }), "Error reading object reference '1'. Path 'Data.Prop2.MyProperty', line 9, position 20.");
+            }), "Error reading object reference '1'. Path 'Data.Prop2.MyProperty', line 9, position 19.");
         }
     }
 

@@ -124,7 +124,9 @@ namespace Newtonsoft.Json.Utilities
                     if (match == null)
                     {
                         if (genericEnumerable.IsAssignableFrom(parameters[0].ParameterType))
+                        {
                             match = constructor;
+                        }
                     }
                 }
             }
@@ -190,8 +192,20 @@ namespace Newtonsoft.Json.Utilities
             return -1;
         }
 
+        public static bool Contains(this IEnumerable list, object value, IEqualityComparer comparer)
+        {
+            foreach (object item in list)
+            {
+                if (comparer.Equals(item, value))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /// <summary>
-        /// Returns the index of the first occurrence in a sequence by using a specified IEqualityComparer.
+        /// Returns the index of the first occurrence in a sequence by using a specified IEqualityComparer{TSource}.
         /// </summary>
         /// <typeparam name="TSource">The type of the elements of source.</typeparam>
         /// <param name="list">A sequence in which to locate a value.</param>

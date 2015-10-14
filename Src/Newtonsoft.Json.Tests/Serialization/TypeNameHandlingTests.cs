@@ -568,7 +568,7 @@ namespace Newtonsoft.Json.Tests.Serialization
                 {
                     TypeNameHandling = TypeNameHandling.Objects
                 });
-            }, "Type specified in JSON 'Newtonsoft.Json.Tests.TestObjects.Employee' was not resolved. Path '$type', line 3, position 56.");
+            }, "Type specified in JSON 'Newtonsoft.Json.Tests.TestObjects.Employee' was not resolved. Path '$type', line 3, position 55.");
         }
 
         public interface ICorrelatedMessage
@@ -2173,5 +2173,4 @@ namespace Newtonsoft.Json.Tests.Serialization
     }
 #endif
 }
-
 #endif
