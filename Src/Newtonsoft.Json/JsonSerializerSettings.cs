@@ -140,7 +140,7 @@ namespace Newtonsoft.Json
         }
 
         /// <summary>
-        /// Gets or sets a collection <see cref="JsonConverter"/> that will be used during serialization.
+        /// Gets or sets a <see cref="JsonConverter"/> collection that will be used during serialization.
         /// </summary>
         /// <value>The converters.</value>
         public IList<JsonConverter> Converters { get; set; }
@@ -158,6 +158,11 @@ namespace Newtonsoft.Json
         /// <summary>
         /// Gets or sets how type name writing and reading is handled by the serializer.
         /// </summary>
+        /// <remarks>
+        /// <see cref="TypeNameHandling"/> should be used with caution when your application deserializes JSON from an external source.
+        /// Incoming types should be validated with a custom <see cref="T:System.Runtime.Serialization.SerializationBinder"/>
+        /// when deserializing with a value other than <c>TypeNameHandling.None</c>.
+        /// </remarks>
         /// <value>The type name handling.</value>
         public TypeNameHandling TypeNameHandling
         {
@@ -228,10 +233,18 @@ namespace Newtonsoft.Json
             get
             {
                 if (ReferenceResolverProvider == null)
+                {
                     return null;
+                }
+
                 return ReferenceResolverProvider();
             }
-            set { ReferenceResolverProvider = () => value; }
+            set
+            {
+                ReferenceResolverProvider = (value != null)
+                    ? () => value
+                    : (Func<IReferenceResolver>)null;
+            }
         }
 
         /// <summary>
@@ -290,7 +303,9 @@ namespace Newtonsoft.Json
             set
             {
                 if (value <= 0)
-                    throw new ArgumentException("Value must be positive.", "value");
+                {
+                    throw new ArgumentException("Value must be positive.", nameof(value));
+                }
 
                 _maxDepth = value;
                 _maxDepthSet = true;

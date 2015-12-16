@@ -24,6 +24,7 @@
 #endregion
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using Newtonsoft.Json.Linq;
@@ -44,6 +45,14 @@ using NUnit.Framework;
 #endif
 using Newtonsoft.Json;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading;
+#if NET20
+using Newtonsoft.Json.Utilities.LinqBridge;
+#else
+using System.Linq;
+#endif
 using System.Xml;
 using Newtonsoft.Json.Utilities;
 
@@ -128,6 +137,7 @@ namespace Newtonsoft.Json.Tests
             Assert.AreEqual(4, jsonTextReader.LineNumber);
             Assert.AreEqual(1, jsonTextReader.LinePosition);
         }
+
         [Test]
         public void ReadCommentInsideArray()
         {
@@ -917,9 +927,10 @@ third line", jsonTextReader.Value);
         [Test]
         public void NullTextReader()
         {
-            ExceptionAssert.Throws<ArgumentNullException> (
-                () => { new JsonTextReader (null); },
-                new string[] { 
+            ExceptionAssert.Throws<ArgumentNullException>(
+                () => { new JsonTextReader(null); },
+                new string[]
+                {
                     "Value cannot be null." + Environment.NewLine + "Parameter name: reader",
                     "Argument cannot be null." + Environment.NewLine + "Parameter name: reader" // Mono
                 });
@@ -1166,6 +1177,76 @@ third line", jsonTextReader.Value);
             Assert.IsTrue(reader.Read());
             Assert.AreEqual(JsonToken.PropertyName, reader.TokenType);
             Assert.AreEqual("type", reader.Value);
+        }
+
+        public class FakeArrayPool : IArrayPool<char>
+        {
+            public readonly List<char[]> FreeArrays = new List<char[]>();
+            public readonly List<char[]> UsedArrays = new List<char[]>();
+
+            public char[] Rent(int minimumLength)
+            {
+                char[] a = FreeArrays.FirstOrDefault(b => b.Length >= minimumLength);
+                if (a != null)
+                {
+                    FreeArrays.Remove(a);
+                    UsedArrays.Add(a);
+
+                    return a;
+                }
+
+                a = new char[minimumLength];
+                UsedArrays.Add(a);
+
+                return a;
+            }
+
+            public void Return(char[] array)
+            {
+                if (UsedArrays.Remove(array))
+                {
+                    FreeArrays.Add(array);
+
+                    // smallest first so the first array large enough is rented
+                    FreeArrays.Sort((b1, b2) => Comparer<int>.Default.Compare(b1.Length, b2.Length));
+                }
+            }
+        }
+
+        [Test]
+        public void BufferTest()
+        {
+            string json = @"{
+              ""CPU"": ""Intel"",
+              ""Description"": ""Amazing!\nBuy now!"",
+              ""Drives"": [
+                ""DVD read/writer"",
+                ""500 gigabyte hard drive"",
+                ""Amazing Drive" + new string('!', 9000) + @"""
+              ]
+            }";
+
+            FakeArrayPool arrayPool = new FakeArrayPool();
+
+            for (int i = 0; i < 1000; i++)
+            {
+                using (JsonTextReader reader = new JsonTextReader(new StringReader(json)))
+                {
+                    reader.ArrayPool = arrayPool;
+
+                    while (reader.Read())
+                    {
+                    }
+                }
+
+                if ((i + 1) % 100 == 0)
+                {
+                    Console.WriteLine("Allocated buffers: " + arrayPool.FreeArrays.Count);
+                }
+            }
+
+            Assert.AreEqual(0, arrayPool.UsedArrays.Count);
+            Assert.AreEqual(6, arrayPool.FreeArrays.Count);
         }
 
         [Test]
@@ -2759,10 +2840,10 @@ third line", jsonTextReader.Value);
 {//comment
 Name://comment
 true//comment after true" + StringUtils.CarriageReturn +
-@",//comment after comma" + StringUtils.CarriageReturnLineFeed + 
-@"""ExpiryDate""://comment"  + StringUtils.LineFeed + 
-@"new " + StringUtils.LineFeed +
-@"Date
+                          @",//comment after comma" + StringUtils.CarriageReturnLineFeed +
+                          @"""ExpiryDate""://comment" + StringUtils.LineFeed +
+                          @"new " + StringUtils.LineFeed +
+                          @"Date
 (//comment
 null//comment
 ),
@@ -3011,7 +3092,6 @@ null//comment
 
             reader.Read();
 
-
             reader = new JsonTextReader(new StringReader(json));
 
             reader.Read();
@@ -3218,7 +3298,6 @@ null//comment
             Assert.AreEqual(typeof(DateTimeOffset), reader.ValueType);
             Assert.IsTrue(reader.Read());
 
-
             reader = new JsonTextReader(new StringReader(json));
             reader.DateParseHandling = Json.DateParseHandling.DateTimeOffset;
 
@@ -3374,6 +3453,73 @@ null//comment
             Assert.IsFalse(r.Read());
         }
 #endif
+
+#if !DNXCORE50
+        [Test]
+        [Ignore]
+        public void ReadFromNetworkStream()
+        {
+            const int port = 11999;
+            const int jsonArrayElementsCount = 193;
+
+            var serverStartedEvent = new ManualResetEvent(false);
+            var clientReceivedEvent = new ManualResetEvent(false);
+
+        #region server
+            ThreadPool.QueueUserWorkItem(work =>
+            {
+                var server = new TcpListener(IPAddress.Parse("0.0.0.0"), port);
+                server.Start();
+
+                serverStartedEvent.Set();
+
+                var serverSocket = server.AcceptSocket();
+
+                var jsonString = "[\r\n" + String.Join(",", Enumerable.Repeat("  \"testdata\"\r\n", jsonArrayElementsCount).ToArray()) + "]";
+                var bytes = new UTF8Encoding().GetBytes(jsonString);
+                serverSocket.Send(bytes);
+                Console.WriteLine("server send: " + bytes.Length);
+
+
+                clientReceivedEvent.WaitOne();
+
+            });
+        #endregion
+
+            serverStartedEvent.WaitOne();
+
+
+            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            socket.Blocking = false;
+            socket.Connect("127.0.0.1", port);
+
+            var stream = new NetworkStream(socket);
+            var serializer = new JsonSerializer();
+
+            int i = 0;
+            using (var sr = new StreamReader(stream, new UTF8Encoding(), false))
+            using (var jsonTextReader = new JsonTextReader(sr))
+            {
+                while (jsonTextReader.Read())
+                {
+                    i++;
+
+                    if (i == 193)
+                    {
+                        string s = string.Empty;
+                    }
+
+                    Console.WriteLine($"{i} - {jsonTextReader.TokenType} - {jsonTextReader.Value}");
+                }
+                //var result = serializer.Deserialize(jsonTextReader).ToString();
+                //Console.WriteLine("client receive: " + new UTF8Encoding().GetBytes(result).Length);
+            }
+
+            clientReceivedEvent.Set();
+
+            Console.WriteLine("Done");
+        }
+#endif
     }
 
     public class ToggleReaderError : TextReader
@@ -3390,7 +3536,9 @@ null//comment
         public override int Read(char[] buffer, int index, int count)
         {
             if (Error)
+            {
                 throw new Exception("Read error");
+            }
 
             return _inner.Read(buffer, index, 1);
         }

@@ -70,6 +70,31 @@ namespace Newtonsoft.Json.Tests.Linq
         }
 
         [Test]
+        public void ToObjectEnum()
+        {
+            StringComparison? v = new JValue("OrdinalIgnoreCase").ToObject<StringComparison?>();
+            Assert.AreEqual(StringComparison.OrdinalIgnoreCase, v.Value);
+
+            v = JValue.CreateNull().ToObject<StringComparison?>();
+            Assert.AreEqual(null, v);
+
+            v = new JValue(5).ToObject<StringComparison?>();
+            Assert.AreEqual(StringComparison.OrdinalIgnoreCase, v.Value);
+
+            v = new JValue(20).ToObject<StringComparison?>();
+            Assert.AreEqual((StringComparison)20, v.Value);
+
+            v = new JValue(20).ToObject<StringComparison>();
+            Assert.AreEqual((StringComparison)20, v.Value);
+
+            v = JsonConvert.DeserializeObject<StringComparison?>("20");
+            Assert.AreEqual((StringComparison)20, v.Value);
+
+            v = JsonConvert.DeserializeObject<StringComparison>("20");
+            Assert.AreEqual((StringComparison)20, v.Value);
+        }
+
+        [Test]
         public void FloatParseHandling()
         {
             JValue v = (JValue)JToken.ReadFrom(
@@ -656,6 +681,11 @@ namespace Newtonsoft.Json.Tests.Linq
 
 #if !(NET20 || NET35 || PORTABLE || PORTABLE40)
             v = new JValue(new BigInteger(3));
+            Assert.AreEqual(TypeCode.Object, v.GetTypeCode());
+#endif
+
+#if !(NET20)
+            v = new JValue(new DateTimeOffset(2000, 12, 12, 12, 12, 12, TimeSpan.Zero));
             Assert.AreEqual(TypeCode.Object, v.GetTypeCode());
 #endif
         }

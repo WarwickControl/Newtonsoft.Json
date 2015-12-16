@@ -128,7 +128,7 @@ namespace Newtonsoft.Json
         internal DateParseHandling _dateParseHandling;
         internal FloatParseHandling _floatParseHandling;
         private string _dateFormatString;
-        private readonly List<JsonPosition> _stack;
+        private List<JsonPosition> _stack;
         private string _typeNameProperty;
 
         /// <summary>
@@ -174,7 +174,15 @@ namespace Newtonsoft.Json
         public DateTimeZoneHandling DateTimeZoneHandling
         {
             get { return _dateTimeZoneHandling; }
-            set { _dateTimeZoneHandling = value; }
+            set
+            {
+                if (value < DateTimeZoneHandling.Local || value > DateTimeZoneHandling.RoundtripKind)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+
+                _dateTimeZoneHandling = value;
+            }
         }
 
         /// <summary>
@@ -183,7 +191,21 @@ namespace Newtonsoft.Json
         public DateParseHandling DateParseHandling
         {
             get { return _dateParseHandling; }
-            set { _dateParseHandling = value; }
+            set
+            {
+                if (value < DateParseHandling.None ||
+#if !NET20
+                    value > DateParseHandling.DateTimeOffset
+#else
+                    value > DateParseHandling.DateTime
+#endif
+                    )
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+
+                _dateParseHandling = value;
+            }
         }
 
         /// <summary>
@@ -192,7 +214,15 @@ namespace Newtonsoft.Json
         public FloatParseHandling FloatParseHandling
         {
             get { return _floatParseHandling; }
-            set { _floatParseHandling = value; }
+            set
+            {
+                if (value < FloatParseHandling.Double || value > FloatParseHandling.Decimal)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+
+                _floatParseHandling = value;
+            }
         }
 
         /// <summary>
@@ -222,7 +252,9 @@ namespace Newtonsoft.Json
             set
             {
                 if (value <= 0)
-                    throw new ArgumentException("Value must be positive.", "value");
+                {
+                    throw new ArgumentException("Value must be positive.", nameof(value));
+                }
 
                 _maxDepth = value;
             }
@@ -260,11 +292,15 @@ namespace Newtonsoft.Json
         {
             get
             {
-                int depth = _stack.Count;
+                int depth = (_stack != null) ? _stack.Count : 0;
                 if (JsonTokenUtils.IsStartToken(TokenType) || _currentPosition.Type == JsonContainerType.None)
+                {
                     return depth;
+                }
                 else
+                {
                     return depth + 1;
+                }
             }
         }
 
@@ -276,17 +312,17 @@ namespace Newtonsoft.Json
             get
             {
                 if (_currentPosition.Type == JsonContainerType.None)
+                {
                     return string.Empty;
+                }
 
                 bool insideContainer = (_currentState != State.ArrayStart
                                         && _currentState != State.ConstructorStart
                                         && _currentState != State.ObjectStart);
 
-                IEnumerable<JsonPosition> positions = (!insideContainer)
-                    ? _stack
-                    : _stack.Concat(new[] { _currentPosition });
+                JsonPosition? current = insideContainer ? (JsonPosition?)_currentPosition : null;
 
-                return JsonPosition.BuildPath(positions);
+                return JsonPosition.BuildPath(_stack, current);
             }
         }
 
@@ -301,8 +337,10 @@ namespace Newtonsoft.Json
 
         internal JsonPosition GetPosition(int depth)
         {
-            if (depth < _stack.Count)
+            if (_stack != null && depth < _stack.Count)
+            {
                 return _stack[depth];
+            }
 
             return _currentPosition;
         }
@@ -313,7 +351,6 @@ namespace Newtonsoft.Json
         protected JsonReader()
         {
             _currentState = State.Start;
-            _stack = new List<JsonPosition>(4);
             _dateTimeZoneHandling = DateTimeZoneHandling.RoundtripKind;
             _dateParseHandling = DateParseHandling.DateTime;
             _floatParseHandling = FloatParseHandling.Double;
@@ -331,6 +368,11 @@ namespace Newtonsoft.Json
             }
             else
             {
+                if (_stack == null)
+                {
+                    _stack = new List<JsonPosition>();
+                }
+
                 _stack.Add(_currentPosition);
                 _currentPosition = new JsonPosition(value);
 
@@ -346,7 +388,7 @@ namespace Newtonsoft.Json
         private JsonContainerType Pop()
         {
             JsonPosition oldPosition;
-            if (_stack.Count > 0)
+            if (_stack != null && _stack.Count > 0)
             {
                 oldPosition = _currentPosition;
                 _currentPosition = _stack[_stack.Count - 1];
@@ -359,7 +401,9 @@ namespace Newtonsoft.Json
             }
 
             if (_maxDepth != null && Depth <= _maxDepth)
+            {
                 _hasExceededMaxDepth = false;
+            }
 
             return oldPosition.Type;
         }
@@ -402,7 +446,7 @@ namespace Newtonsoft.Json
         /// <summary>
         /// Reads the next JSON token from the stream as a <see cref="Nullable{DateTime}"/>.
         /// </summary>
-        /// <returns>A <see cref="String"/>. This method will return <c>null</c> at the end of an array.</returns>
+        /// <returns>A <see cref="Nullable{DateTime}"/>. This method will return <c>null</c> at the end of an array.</returns>
         public abstract DateTime? ReadAsDateTime();
 
 #if !NET20
@@ -441,13 +485,17 @@ namespace Newtonsoft.Json
             if (t == JsonToken.Date)
             {
                 if (Value is DateTime)
+                {
                     SetToken(JsonToken.Date, new DateTimeOffset((DateTime)Value), false);
+                }
 
                 return (DateTimeOffset)Value;
             }
 
             if (t == JsonToken.Null)
+            {
                 return null;
+            }
 
             if (t == JsonToken.String)
             {
@@ -458,11 +506,9 @@ namespace Newtonsoft.Json
                     return null;
                 }
 
-                object temp;
                 DateTimeOffset dt;
-                if (DateTimeUtils.TryParseDateTime(s, DateParseHandling.DateTimeOffset, DateTimeZoneHandling, _dateFormatString, Culture, out temp))
+                if (DateTimeUtils.TryParseDateTimeOffset(s, _dateFormatString, Culture, out dt))
                 {
-                    dt = (DateTimeOffset)temp;
                     SetToken(JsonToken.Date, dt, false);
                     return dt;
                 }
@@ -472,12 +518,14 @@ namespace Newtonsoft.Json
                     SetToken(JsonToken.Date, dt, false);
                     return dt;
                 }
-                
+
                 throw JsonReaderException.Create(this, "Could not convert string to DateTimeOffset: {0}.".FormatWith(CultureInfo.InvariantCulture, Value));
             }
 
             if (t == JsonToken.EndArray)
+            {
                 return null;
+            }
 
             throw JsonReaderException.Create(this, "Error reading date. Unexpected token: {0}.".FormatWith(CultureInfo.InvariantCulture, t));
         }
@@ -537,7 +585,9 @@ namespace Newtonsoft.Json
             }
 
             if (t == JsonToken.Null)
+            {
                 return null;
+            }
 
             if (t == JsonToken.Bytes)
             {
@@ -579,7 +629,9 @@ namespace Newtonsoft.Json
             }
 
             if (t == JsonToken.EndArray)
+            {
                 return null;
+            }
 
             throw JsonReaderException.Create(this, "Error reading bytes. Unexpected token: {0}.".FormatWith(CultureInfo.InvariantCulture, t));
         }
@@ -606,13 +658,17 @@ namespace Newtonsoft.Json
             if (t == JsonToken.Integer || t == JsonToken.Float)
             {
                 if (!(Value is decimal))
+                {
                     SetToken(JsonToken.Float, Convert.ToDecimal(Value, CultureInfo.InvariantCulture), false);
+                }
 
                 return (decimal)Value;
             }
 
             if (t == JsonToken.Null)
+            {
                 return null;
+            }
 
             if (t == JsonToken.String)
             {
@@ -636,7 +692,9 @@ namespace Newtonsoft.Json
             }
 
             if (t == JsonToken.EndArray)
+            {
                 return null;
+            }
 
             throw JsonReaderException.Create(this, "Error reading decimal. Unexpected token: {0}.".FormatWith(CultureInfo.InvariantCulture, t));
         }
@@ -663,13 +721,17 @@ namespace Newtonsoft.Json
             if (t == JsonToken.Integer || t == JsonToken.Float)
             {
                 if (!(Value is int))
+                {
                     SetToken(JsonToken.Integer, Convert.ToInt32(Value, CultureInfo.InvariantCulture), false);
+                }
 
                 return (int)Value;
             }
 
             if (t == JsonToken.Null)
+            {
                 return null;
+            }
 
             int i;
             if (t == JsonToken.String)
@@ -693,7 +755,9 @@ namespace Newtonsoft.Json
             }
 
             if (t == JsonToken.EndArray)
+            {
                 return null;
+            }
 
             throw JsonReaderException.Create(this, "Error reading integer. Unexpected token: {0}.".FormatWith(CultureInfo.InvariantCulture, TokenType));
         }
@@ -718,10 +782,14 @@ namespace Newtonsoft.Json
             } while (t == JsonToken.Comment);
 
             if (t == JsonToken.String)
+            {
                 return (string)Value;
+            }
 
             if (t == JsonToken.Null)
+            {
                 return null;
+            }
 
             if (JsonTokenUtils.IsPrimitiveToken(t))
             {
@@ -729,9 +797,13 @@ namespace Newtonsoft.Json
                 {
                     string s;
                     if (Value is IFormattable)
+                    {
                         s = ((IFormattable)Value).ToString(null, Culture);
+                    }
                     else
+                    {
                         s = Value.ToString();
+                    }
 
                     SetToken(JsonToken.String, s, false);
                     return s;
@@ -739,7 +811,9 @@ namespace Newtonsoft.Json
             }
 
             if (t == JsonToken.EndArray)
+            {
                 return null;
+            }
 
             throw JsonReaderException.Create(this, "Error reading string. Unexpected token: {0}.".FormatWith(CultureInfo.InvariantCulture, t));
         }
@@ -758,10 +832,14 @@ namespace Newtonsoft.Json
             } while (TokenType == JsonToken.Comment);
 
             if (TokenType == JsonToken.Date)
+            {
                 return (DateTime)Value;
+            }
 
             if (TokenType == JsonToken.Null)
+            {
                 return null;
+            }
 
             if (TokenType == JsonToken.String)
             {
@@ -773,10 +851,8 @@ namespace Newtonsoft.Json
                 }
 
                 DateTime dt;
-                object temp;
-                if (DateTimeUtils.TryParseDateTime(s, DateParseHandling.DateTime, DateTimeZoneHandling, _dateFormatString, Culture, out temp))
+                if (DateTimeUtils.TryParseDateTime(s, DateTimeZoneHandling, _dateFormatString, Culture, out dt))
                 {
-                    dt = (DateTime)temp;
                     dt = DateTimeUtils.EnsureDateTime(dt, DateTimeZoneHandling);
                     SetToken(JsonToken.Date, dt, false);
                     return dt;
@@ -793,7 +869,9 @@ namespace Newtonsoft.Json
             }
 
             if (TokenType == JsonToken.EndArray)
+            {
                 return null;
+            }
 
             throw JsonReaderException.Create(this, "Error reading date. Unexpected token: {0}.".FormatWith(CultureInfo.InvariantCulture, TokenType));
         }
@@ -805,7 +883,9 @@ namespace Newtonsoft.Json
             if (TokenType == JsonToken.StartObject)
             {
                 if (!ReadInternal())
+                {
                     throw JsonReaderException.Create(this, "Unexpected end when reading bytes.");
+                }
 
                 if (Value.ToString() == TypeNameProperty)
                 {
@@ -832,7 +912,9 @@ namespace Newtonsoft.Json
         public void Skip()
         {
             if (TokenType == JsonToken.PropertyName)
+            {
                 Read();
+            }
 
             if (JsonTokenUtils.IsStartToken(TokenType))
             {
@@ -913,18 +995,26 @@ namespace Newtonsoft.Json
         internal void SetPostValueState(bool updateIndex)
         {
             if (Peek() != JsonContainerType.None)
+            {
                 _currentState = State.PostValue;
+            }
             else
+            {
                 SetFinished();
+            }
 
             if (updateIndex)
+            {
                 UpdateScopeWithFinishedValue();
+            }
         }
 
         private void UpdateScopeWithFinishedValue()
         {
             if (_currentPosition.HasIndex)
+            {
                 _currentPosition.Position++;
+            }
         }
 
         private void ValidateEnd(JsonToken endToken)
@@ -932,12 +1022,18 @@ namespace Newtonsoft.Json
             JsonContainerType currentObject = Pop();
 
             if (GetTypeForCloseToken(endToken) != currentObject)
+            {
                 throw JsonReaderException.Create(this, "JsonToken {0} is not valid for closing JsonType {1}.".FormatWith(CultureInfo.InvariantCulture, endToken, currentObject));
+            }
 
             if (Peek() != JsonContainerType.None)
+            {
                 _currentState = State.PostValue;
+            }
             else
+            {
                 SetFinished();
+            }
         }
 
         /// <summary>
@@ -969,9 +1065,13 @@ namespace Newtonsoft.Json
         private void SetFinished()
         {
             if (SupportMultipleContent)
+            {
                 _currentState = State.Start;
+            }
             else
+            {
                 _currentState = State.Finished;
+            }
         }
 
         private JsonContainerType GetTypeForCloseToken(JsonToken token)
@@ -1004,7 +1104,9 @@ namespace Newtonsoft.Json
         protected virtual void Dispose(bool disposing)
         {
             if (_currentState != State.Closed && disposing)
+            {
                 Close();
+            }
         }
 
         /// <summary>

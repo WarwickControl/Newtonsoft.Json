@@ -345,7 +345,6 @@ namespace Newtonsoft.Json.Tests
                     ""Property5"":""5""
                 }";
 
-
             var watch = new Stopwatch();
             watch.Start();
             for (long iteration = 0; iteration < totalIterations; ++iteration)
@@ -430,7 +429,7 @@ If attributes are not mentioned, default values are used in each case.
                     using (StringWriter w = StringUtils.CreateStringWriter(StringUtils.GetLength(text) ?? 16))
                     {
                         char[] buffer = null;
-                        JavaScriptUtils.WriteEscapedJavaScriptString(w, text, '"', true, JavaScriptUtils.DoubleQuoteCharEscapeFlags, StringEscapeHandling.Default, ref buffer);
+                        JavaScriptUtils.WriteEscapedJavaScriptString(w, text, '"', true, JavaScriptUtils.DoubleQuoteCharEscapeFlags, StringEscapeHandling.Default, null, ref buffer);
                     }
                 }
 
@@ -583,7 +582,6 @@ If attributes are not mentioned, default values are used in each case.
             TestClass test = new TestClass();
 
             test.dictionary = new Dictionary<string, int> { { "Val & asd1", 1 }, { "Val2 & asd1", 3 }, { "Val3 & asd1", 4 } };
-
 
             test.Address1.Street = "fff Street";
             test.Address1.Entered = DateTime.Now.AddDays(20);
@@ -786,7 +784,7 @@ If attributes are not mentioned, default values are used in each case.
                     json = SerializeBinaryFormatter(value);
                     break;
                 default:
-                    throw new ArgumentOutOfRangeException("method");
+                    throw new ArgumentOutOfRangeException(nameof(method));
             }
 
             return json;
@@ -811,7 +809,9 @@ If attributes are not mentioned, default values are used in each case.
             GC.Collect();
 
             if (warmUp)
+            {
                 Deserialize<T>(method, json);
+            }
 
             Stopwatch timed = new Stopwatch();
             timed.Start();
@@ -841,7 +841,9 @@ If attributes are not mentioned, default values are used in each case.
             //serializer.MissingMemberHandling = Newtonsoft.Json.MissingMemberHandling.Ignore;
             //serializer.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
             if (isoDateTimeConverter)
+            {
                 serializer.Converters.Add(new IsoDateTimeConverter());
+            }
 
             var value = (T)serializer.Deserialize(new StringReader(json), type);
             return value;
@@ -973,7 +975,9 @@ If attributes are not mentioned, default values are used in each case.
                     return DeserializeJsonNet<T>((string)json, true);
                 case SerializeMethod.JsonNetManual:
                     if (typeof(T) == typeof(TestClass))
+                    {
                         return (T)(object)DeserializeJsonNetManual((string)json);
+                    }
 
                     return default(T);
                 case SerializeMethod.JsonNetBinary:
@@ -987,7 +991,7 @@ If attributes are not mentioned, default values are used in each case.
                 case SerializeMethod.DataContractJsonSerializer:
                     return DeserializeDataContractJson<T>((string)json);
                 default:
-                    throw new ArgumentOutOfRangeException("method");
+                    throw new ArgumentOutOfRangeException(nameof(method));
             }
         }
 
@@ -1020,9 +1024,13 @@ If attributes are not mentioned, default values are used in each case.
                 };
 
                 if (rootValue == null)
+                {
                     rootValue = currentValue;
+                }
                 if (parentValue != null)
+                {
                     parentValue.Child = currentValue;
+                }
 
                 parentValue = currentValue;
             }
@@ -1205,7 +1213,6 @@ If attributes are not mentioned, default values are used in each case.
         }
 
         private Address _Address1 = new Address();
-
 
         [DataMember]
         public List<Address> Addresses

@@ -48,16 +48,24 @@ namespace Newtonsoft.Json.Utilities
         public void Encode(byte[] buffer, int index, int count)
         {
             if (buffer == null)
-                throw new ArgumentNullException("buffer");
+            {
+                throw new ArgumentNullException(nameof(buffer));
+            }
 
             if (index < 0)
-                throw new ArgumentOutOfRangeException("index");
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
 
             if (count < 0)
-                throw new ArgumentOutOfRangeException("count");
+            {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
 
             if (count > (buffer.Length - index))
-                throw new ArgumentOutOfRangeException("count");
+            {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
 
             if (_leftOverBytesCount > 0)
             {

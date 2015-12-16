@@ -64,16 +64,16 @@ namespace Newtonsoft.Json
 
         internal static readonly State[][] StateArrayTempate = new[]
         {
-            //                                      Start                    PropertyName            ObjectStart         Object            ArrayStart              Array                   ConstructorStart        Constructor             Closed          Error
+            //                                      Start                    PropertyName            ObjectStart         Object            ArrayStart              Array                   ConstructorStart        Constructor             Closed       Error
             //
-            /* None                        */new[] { State.Error,            State.Error,            State.Error,        State.Error,      State.Error,            State.Error,            State.Error,            State.Error,            State.Error,    State.Error },
-            /* StartObject                 */new[] { State.ObjectStart,      State.ObjectStart,      State.Error,        State.Error,      State.ObjectStart,      State.ObjectStart,      State.ObjectStart,      State.ObjectStart,      State.Error,    State.Error },
-            /* StartArray                  */new[] { State.ArrayStart,       State.ArrayStart,       State.Error,        State.Error,      State.ArrayStart,       State.ArrayStart,       State.ArrayStart,       State.ArrayStart,       State.Error,    State.Error },
-            /* StartConstructor            */new[] { State.ConstructorStart, State.ConstructorStart, State.Error,        State.Error,      State.ConstructorStart, State.ConstructorStart, State.ConstructorStart, State.ConstructorStart, State.Error,    State.Error },
-            /* Property                    */new[] { State.Property,         State.Error,            State.Property,     State.Property,   State.Error,            State.Error,            State.Error,            State.Error,            State.Error,    State.Error },
-            /* Comment                     */new[] { State.Start,            State.Property,         State.ObjectStart,  State.Object,     State.ArrayStart,       State.Array,            State.Constructor,      State.Constructor,      State.Error,    State.Error },
-            /* Raw                         */new[] { State.Start,            State.Property,         State.ObjectStart,  State.Object,     State.ArrayStart,       State.Array,            State.Constructor,      State.Constructor,      State.Error,    State.Error },
-            /* Value (this will be copied) */new[] { State.Start,            State.Object,           State.Error,        State.Error,      State.Array,            State.Array,            State.Constructor,      State.Constructor,      State.Error,    State.Error }
+            /* None                        */new[] { State.Error,            State.Error,            State.Error,        State.Error,      State.Error,            State.Error,            State.Error,            State.Error,            State.Error, State.Error },
+            /* StartObject                 */new[] { State.ObjectStart,      State.ObjectStart,      State.Error,        State.Error,      State.ObjectStart,      State.ObjectStart,      State.ObjectStart,      State.ObjectStart,      State.Error, State.Error },
+            /* StartArray                  */new[] { State.ArrayStart,       State.ArrayStart,       State.Error,        State.Error,      State.ArrayStart,       State.ArrayStart,       State.ArrayStart,       State.ArrayStart,       State.Error, State.Error },
+            /* StartConstructor            */new[] { State.ConstructorStart, State.ConstructorStart, State.Error,        State.Error,      State.ConstructorStart, State.ConstructorStart, State.ConstructorStart, State.ConstructorStart, State.Error, State.Error },
+            /* Property                    */new[] { State.Property,         State.Error,            State.Property,     State.Property,   State.Error,            State.Error,            State.Error,            State.Error,            State.Error, State.Error },
+            /* Comment                     */new[] { State.Start,            State.Property,         State.ObjectStart,  State.Object,     State.ArrayStart,       State.Array,            State.Constructor,      State.Constructor,      State.Error, State.Error },
+            /* Raw                         */new[] { State.Start,            State.Property,         State.ObjectStart,  State.Object,     State.ArrayStart,       State.Array,            State.Constructor,      State.Constructor,      State.Error, State.Error },
+            /* Value (this will be copied) */new[] { State.Start,            State.Object,           State.Error,        State.Error,      State.Array,            State.Array,            State.Constructor,      State.Constructor,      State.Error, State.Error }
         };
 
         internal static State[][] BuildStateArray()
@@ -113,7 +113,7 @@ namespace Newtonsoft.Json
             StateArray = BuildStateArray();
         }
 
-        private readonly List<JsonPosition> _stack;
+        private List<JsonPosition> _stack;
         private JsonPosition _currentPosition;
         private State _currentState;
         private Formatting _formatting;
@@ -136,9 +136,11 @@ namespace Newtonsoft.Json
         {
             get
             {
-                int depth = _stack.Count;
+                int depth = (_stack != null) ? _stack.Count : 0;
                 if (Peek() != JsonContainerType.None)
+                {
                     depth++;
+                }
 
                 return depth;
             }
@@ -180,10 +182,12 @@ namespace Newtonsoft.Json
         {
             get
             {
-                if (_currentPosition.Type == JsonContainerType.None)
+                if (_currentPosition.Type == JsonContainerType.None || _stack == null)
+                {
                     return string.Empty;
+                }
 
-                return JsonPosition.BuildPath(_stack);
+                return JsonPosition.BuildPath(_stack, null);
             }
         }
 
@@ -195,17 +199,17 @@ namespace Newtonsoft.Json
             get
             {
                 if (_currentPosition.Type == JsonContainerType.None)
+                {
                     return string.Empty;
+                }
 
                 bool insideContainer = (_currentState != State.ArrayStart
                                         && _currentState != State.ConstructorStart
                                         && _currentState != State.ObjectStart);
 
-                IEnumerable<JsonPosition> positions = (!insideContainer)
-                    ? _stack
-                    : _stack.Concat(new[] { _currentPosition });
+                JsonPosition? current = insideContainer ? (JsonPosition?)_currentPosition : null;
 
-                return JsonPosition.BuildPath(positions);
+                return JsonPosition.BuildPath(_stack, current);
             }
         }
 
@@ -222,7 +226,15 @@ namespace Newtonsoft.Json
         public Formatting Formatting
         {
             get { return _formatting; }
-            set { _formatting = value; }
+            set
+            {
+                if (value < Formatting.None || value > Formatting.Indented)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+
+                _formatting = value;
+            }
         }
 
         /// <summary>
@@ -231,7 +243,15 @@ namespace Newtonsoft.Json
         public DateFormatHandling DateFormatHandling
         {
             get { return _dateFormatHandling; }
-            set { _dateFormatHandling = value; }
+            set
+            {
+                if (value < DateFormatHandling.IsoDateFormat || value > DateFormatHandling.MicrosoftDateFormat)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+
+                _dateFormatHandling = value;
+            }
         }
 
         /// <summary>
@@ -240,7 +260,15 @@ namespace Newtonsoft.Json
         public DateTimeZoneHandling DateTimeZoneHandling
         {
             get { return _dateTimeZoneHandling; }
-            set { _dateTimeZoneHandling = value; }
+            set
+            {
+                if (value < DateTimeZoneHandling.Local || value > DateTimeZoneHandling.RoundtripKind)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+
+                _dateTimeZoneHandling = value;
+            }
         }
 
         /// <summary>
@@ -251,6 +279,11 @@ namespace Newtonsoft.Json
             get { return _stringEscapeHandling; }
             set
             {
+                if (value < StringEscapeHandling.Default || value > StringEscapeHandling.EscapeHtml)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+
                 _stringEscapeHandling = value;
                 OnStringEscapeHandlingChanged();
             }
@@ -269,7 +302,15 @@ namespace Newtonsoft.Json
         public FloatFormatHandling FloatFormatHandling
         {
             get { return _floatFormatHandling; }
-            set { _floatFormatHandling = value; }
+            set
+            {
+                if (value < FloatFormatHandling.String || value > FloatFormatHandling.DefaultValue)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+
+                _floatFormatHandling = value;
+            }
         }
 
         /// <summary>
@@ -295,7 +336,6 @@ namespace Newtonsoft.Json
         /// </summary>
         protected JsonWriter()
         {
-            _stack = new List<JsonPosition>(4);
             _currentState = State.Start;
             _formatting = Formatting.None;
             _dateTimeZoneHandling = DateTimeZoneHandling.RoundtripKind;
@@ -306,13 +346,22 @@ namespace Newtonsoft.Json
         internal void UpdateScopeWithFinishedValue()
         {
             if (_currentPosition.HasIndex)
+            {
                 _currentPosition.Position++;
+            }
         }
 
         private void Push(JsonContainerType value)
         {
             if (_currentPosition.Type != JsonContainerType.None)
+            {
+                if (_stack == null)
+                {
+                    _stack = new List<JsonPosition>();
+                }
+
                 _stack.Add(_currentPosition);
+            }
 
             _currentPosition = new JsonPosition(value);
         }
@@ -321,7 +370,7 @@ namespace Newtonsoft.Json
         {
             JsonPosition oldPosition = _currentPosition;
 
-            if (_stack.Count > 0)
+            if (_stack != null && _stack.Count > 0)
             {
                 _currentPosition = _stack[_stack.Count - 1];
                 _stack.RemoveAt(_stack.Count - 1);
@@ -476,11 +525,17 @@ namespace Newtonsoft.Json
             int initialDepth;
 
             if (reader.TokenType == JsonToken.None)
+            {
                 initialDepth = -1;
+            }
             else if (!JsonTokenUtils.IsStartToken(reader.TokenType))
+            {
                 initialDepth = reader.Depth + 1;
+            }
             else
+            {
                 initialDepth = reader.Depth;
+            }
 
             WriteToken(reader, initialDepth, writeChildren, writeDateConstructorAsDate, writeComments);
         }
@@ -548,13 +603,21 @@ namespace Newtonsoft.Json
                 case JsonToken.Float:
                     ValidationUtils.ArgumentNotNull(value, "value");
                     if (value is decimal)
+                    {
                         WriteValue((decimal)value);
+                    }
                     else if (value is double)
+                    {
                         WriteValue((double)value);
+                    }
                     else if (value is float)
+                    {
                         WriteValue((float)value);
+                    }
                     else
+                    {
                         WriteValue(Convert.ToDouble(value, CultureInfo.InvariantCulture));
+                    }
                     break;
                 case JsonToken.String:
                     ValidationUtils.ArgumentNotNull(value, "value");
@@ -583,10 +646,14 @@ namespace Newtonsoft.Json
                     ValidationUtils.ArgumentNotNull(value, "value");
 #if !NET20
                     if (value is DateTimeOffset)
+                    {
                         WriteValue((DateTimeOffset)value);
+                    }
                     else
 #endif
+                    {
                         WriteValue(Convert.ToDateTime(value, CultureInfo.InvariantCulture));
+                    }
                     break;
                 case JsonToken.Raw:
                     WriteRawValue((value != null) ? value.ToString() : null);
@@ -594,9 +661,13 @@ namespace Newtonsoft.Json
                 case JsonToken.Bytes:
                     ValidationUtils.ArgumentNotNull(value, "value");
                     if (value is Guid)
+                    {
                         WriteValue((Guid)value);
+                    }
                     else
+                    {
                         WriteValue((byte[])value);
+                    }
                     break;
                 default:
                     throw MiscellaneousUtils.CreateArgumentOutOfRangeException("TokenType", tokenType, "Unexpected token type.");
@@ -606,17 +677,25 @@ namespace Newtonsoft.Json
         private void WriteConstructorDate(JsonReader reader)
         {
             if (!reader.Read())
+            {
                 throw JsonWriterException.Create(this, "Unexpected end when reading date constructor.", null);
+            }
             if (reader.TokenType != JsonToken.Integer)
+            {
                 throw JsonWriterException.Create(this, "Unexpected token when reading date constructor. Expected Integer, got " + reader.TokenType, null);
+            }
 
             long ticks = (long)reader.Value;
             DateTime date = DateTimeUtils.ConvertJavaScriptTicksToDateTime(ticks);
 
             if (!reader.Read())
+            {
                 throw JsonWriterException.Create(this, "Unexpected end when reading date constructor.", null);
+            }
             if (reader.TokenType != JsonToken.EndConstructor)
+            {
                 throw JsonWriterException.Create(this, "Unexpected token when reading date constructor. Expected EndConstructor, got " + reader.TokenType, null);
+            }
 
             WriteValue(date);
         }
@@ -687,19 +766,25 @@ namespace Newtonsoft.Json
             }
 
             if (levelsToComplete == 0)
+            {
                 throw JsonWriterException.Create(this, "No token to close.", null);
+            }
 
             for (int i = 0; i < levelsToComplete; i++)
             {
                 JsonToken token = GetCloseTokenForType(Pop());
 
                 if (_currentState == State.Property)
+                {
                     WriteNull();
+                }
 
                 if (_formatting == Formatting.Indented)
                 {
                     if (_currentState != State.ObjectStart && _currentState != State.ArrayStart)
+                    {
                         WriteIndent();
+                    }
                 }
 
                 WriteEnd(token);
@@ -761,7 +846,9 @@ namespace Newtonsoft.Json
             State newState = StateArray[(int)tokenBeingWritten][(int)_currentState];
 
             if (newState == State.Error)
+            {
                 throw JsonWriterException.Create(this, "Token {0} in state {1} would result in an invalid JSON object.".FormatWith(CultureInfo.InvariantCulture, tokenBeingWritten.ToString(), _currentState.ToString()), null);
+            }
 
             if ((_currentState == State.Object || _currentState == State.Array || _currentState == State.Constructor) && tokenBeingWritten != JsonToken.Comment)
             {
@@ -771,12 +858,16 @@ namespace Newtonsoft.Json
             if (_formatting == Formatting.Indented)
             {
                 if (_currentState == State.Property)
+                {
                     WriteIndentSpace();
+                }
 
                 // don't indent a property when it is the first token to be written (i.e. at the start)
                 if ((_currentState == State.Array || _currentState == State.ArrayStart || _currentState == State.Constructor || _currentState == State.ConstructorStart)
                     || (tokenBeingWritten == JsonToken.PropertyName && _currentState != State.Start))
+                {
                     WriteIndent();
+                }
             }
 
             _currentState = newState;
@@ -995,9 +1086,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(int? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1008,9 +1103,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(uint? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1020,9 +1119,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(long? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1033,9 +1136,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(ulong? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1045,9 +1152,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(float? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1057,9 +1168,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(double? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1069,9 +1184,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(bool? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1081,9 +1200,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(short? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1094,9 +1217,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(ushort? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1106,9 +1233,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(char? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1118,9 +1249,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(byte? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1131,9 +1266,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(sbyte? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1143,9 +1282,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(decimal? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1155,9 +1298,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(DateTime? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
 #if !NET20
@@ -1168,9 +1315,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(DateTimeOffset? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 #endif
 
@@ -1181,9 +1332,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(Guid? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1193,9 +1348,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(TimeSpan? value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
-                WriteValue(value.Value);
+            {
+                WriteValue(value.GetValueOrDefault());
+            }
         }
 
         /// <summary>
@@ -1205,9 +1364,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(byte[] value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
+            {
                 InternalWriteValue(JsonToken.Bytes);
+            }
         }
 
         /// <summary>
@@ -1217,9 +1380,13 @@ namespace Newtonsoft.Json
         public virtual void WriteValue(Uri value)
         {
             if (value == null)
+            {
                 WriteNull();
+            }
             else
+            {
                 InternalWriteValue(JsonToken.String);
+            }
         }
 
         /// <summary>
@@ -1239,7 +1406,9 @@ namespace Newtonsoft.Json
                 // this is here because adding a WriteValue(BigInteger) to JsonWriter will
                 // mean the user has to add a reference to System.Numerics.dll
                 if (value is BigInteger)
+                {
                     throw CreateUnsupportedTypeException(this, value);
+                }
 #endif
 
                 WriteValue(this, ConvertUtils.GetTypeCode(value.GetType()), value);
@@ -1273,7 +1442,9 @@ namespace Newtonsoft.Json
         private void Dispose(bool disposing)
         {
             if (_currentState != State.Closed)
+            {
                 Close();
+            }
         }
 
         internal static void WriteValue(JsonWriter writer, PrimitiveTypeCode typeCode, object value)
@@ -1460,7 +1631,9 @@ namespace Newtonsoft.Json
                     break;
                 case JsonToken.PropertyName:
                     if (!(value is string))
-                        throw new ArgumentException("A name is required when setting property name state.", "value");
+                    {
+                        throw new ArgumentException("A name is required when setting property name state.", nameof(value));
+                    }
 
                     InternalWritePropertyName((string)value);
                     break;
@@ -1490,7 +1663,7 @@ namespace Newtonsoft.Json
                     InternalWriteEnd(JsonContainerType.Constructor);
                     break;
                 default:
-                    throw new ArgumentOutOfRangeException("token");
+                    throw new ArgumentOutOfRangeException(nameof(token));
             }
         }
 
@@ -1527,7 +1700,9 @@ namespace Newtonsoft.Json
             if (ws != null)
             {
                 if (!StringUtils.IsWhiteSpace(ws))
+                {
                     throw JsonWriterException.Create(this, "Only white space characters should be used.", null);
+                }
             }
         }
 

@@ -127,7 +127,9 @@ namespace Newtonsoft.Json.Linq
             if (reader.TokenType == JsonToken.None)
             {
                 if (!reader.Read())
+                {
                     throw JsonReaderException.Create(reader, "Error reading JArray from JsonReader.");
+                }
             }
 
             while (reader.TokenType == JsonToken.Comment)
@@ -136,10 +138,12 @@ namespace Newtonsoft.Json.Linq
             }
 
             if (reader.TokenType != JsonToken.StartArray)
+            {
                 throw JsonReaderException.Create(reader, "Error reading JArray from JsonReader. Current JsonReader item is not an array: {0}".FormatWith(CultureInfo.InvariantCulture, reader.TokenType));
+            }
 
             JArray a = new JArray();
-            a.SetLineInfo(reader as IJsonLineInfo);
+            a.SetLineInfo(reader as IJsonLineInfo, settings);
 
             a.ReadTokenFrom(reader, settings);
 
@@ -176,7 +180,9 @@ namespace Newtonsoft.Json.Linq
                 JArray a = Load(reader, settings);
 
                 if (reader.Read() && reader.TokenType != JsonToken.Comment)
+                {
                     throw JsonReaderException.Create(reader, "Additional text found in JSON string after parsing content.");
+                }
 
                 return a;
             }
@@ -203,7 +209,9 @@ namespace Newtonsoft.Json.Linq
             JToken token = FromObjectInternal(o, jsonSerializer);
 
             if (token.Type != JTokenType.Array)
+            {
                 throw new ArgumentException("Object serialized to {0}. JArray instance expected.".FormatWith(CultureInfo.InvariantCulture, token.Type));
+            }
 
             return (JArray)token;
         }
@@ -236,7 +244,9 @@ namespace Newtonsoft.Json.Linq
                 ValidationUtils.ArgumentNotNull(key, "o");
 
                 if (!(key is int))
-                    throw new ArgumentException("Accessed JArray values with invalid key value: {0}. Array position index expected.".FormatWith(CultureInfo.InvariantCulture, MiscellaneousUtils.ToString(key)));
+                {
+                    throw new ArgumentException("Accessed JArray values with invalid key value: {0}. Int32 array index expected.".FormatWith(CultureInfo.InvariantCulture, MiscellaneousUtils.ToString(key)));
+                }
 
                 return GetItem((int)key);
             }
@@ -245,7 +255,9 @@ namespace Newtonsoft.Json.Linq
                 ValidationUtils.ArgumentNotNull(key, "o");
 
                 if (!(key is int))
-                    throw new ArgumentException("Set JArray values with invalid key value: {0}. Array position index expected.".FormatWith(CultureInfo.InvariantCulture, MiscellaneousUtils.ToString(key)));
+                {
+                    throw new ArgumentException("Set JArray values with invalid key value: {0}. Int32 array index expected.".FormatWith(CultureInfo.InvariantCulture, MiscellaneousUtils.ToString(key)));
+                }
 
                 SetItem((int)key, value);
             }
@@ -267,7 +279,9 @@ namespace Newtonsoft.Json.Linq
                 ? (IEnumerable)content
                 : null;
             if (a == null)
+            {
                 return;
+            }
 
             MergeEnumerableContent(this, a, settings);
         }

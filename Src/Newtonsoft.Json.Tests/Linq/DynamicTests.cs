@@ -114,13 +114,21 @@ namespace Newtonsoft.Json.Tests.Linq
             Stopwatch sw = new Stopwatch();
             sw.Start();
 
+            int count = 0;
             foreach (dynamic o in d)
             {
+                if (count > 10)
+                {
+                    break;
+                }
+
                 foreach (dynamic friend in o.friends)
                 {
                     UpdateValueCount(counts, friend.id);
-                    UpdateValueCount(counts, ((string) friend.name).Split(' ')[0]);
+                    UpdateValueCount(counts, ((string)friend.name).Split(' ')[0]);
                 }
+
+                count++;
             }
 
             Console.WriteLine("Time (secs): " + sw.Elapsed.TotalSeconds);
@@ -855,7 +863,6 @@ namespace Newtonsoft.Json.Tests.Linq
             string oldRole = (string)oldAndBusted["Roles"][0];
             // Admin
 
-
             dynamic newHotness = new JObject();
             newHotness.Name = "Arnie Admin";
             newHotness.Enabled = true;
@@ -901,6 +908,57 @@ namespace Newtonsoft.Json.Tests.Linq
   ""StockCount"": 9000,
   ""StockValue"": 22050.00
 }", json);
+        }
+
+        [Test]
+        public void DynamicAccess_ToJToken_ShouldNotFail()
+        {
+            Guid g = Guid.NewGuid();
+            dynamic json = JObject.FromObject(new { uid = g });
+            JToken token = json.uid;
+
+            Assert.AreEqual(g, ((JValue)token).Value);
+        }
+
+        [Test]
+        public void DynamicAccess_ToJTokenExplicit_ShouldNotFail()
+        {
+            Guid g = Guid.NewGuid();
+            dynamic json = JObject.FromObject(new { uid = g });
+            JToken token = (JToken)json.uid;
+
+            Assert.AreEqual(g, ((JValue)token).Value);
+        }
+
+        [Test]
+        public void DynamicAccess_ToJTokenSafeCast_ShouldNotFail()
+        {
+            Guid g = Guid.NewGuid();
+            dynamic json = JObject.FromObject(new { uid = g });
+            JToken token = json.uid as JToken;
+
+            Assert.AreEqual(g, ((JValue)token).Value);
+        }
+
+        [Test]
+        public void IndexAccess_ToJToken_ShouldNotFail()
+        {
+            Guid g = Guid.NewGuid();
+            JObject json = JObject.FromObject(new { uid = g });
+            JToken token = json["uid"];
+
+            Assert.AreEqual(g, ((JValue)token).Value);
+        }
+
+        [Test]
+        public void DynamicAccess_ToJToken_ShouldFail()
+        {
+            Guid g = Guid.NewGuid();
+            dynamic json = JObject.FromObject(new { uid = g });
+
+            ExceptionAssert.Throws<InvalidOperationException>(
+                () => { JObject token = json.uid; },
+                "Can not convert from System.Guid to Newtonsoft.Json.Linq.JObject.");
         }
     }
 
