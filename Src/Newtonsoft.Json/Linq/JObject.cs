@@ -141,7 +141,7 @@ namespace Newtonsoft.Json.Linq
 
         internal override void ValidateToken(JToken o, JToken existing)
         {
-            ValidationUtils.ArgumentNotNull(o, "o");
+            ValidationUtils.ArgumentNotNull(o, nameof(o));
 
             if (o.Type != JTokenType.Property)
             {
@@ -187,7 +187,7 @@ namespace Newtonsoft.Json.Linq
                     JContainer existingContainer = existingProperty.Value as JContainer;
                     if (existingContainer == null)
                     {
-                        if (contentItem.Value.Type != JTokenType.Null)
+                        if (contentItem.Value.Type != JTokenType.Null || settings?.MergeNullValueHandling == MergeNullValueHandling.Merge)
                         {
                             existingProperty.Value = contentItem.Value;
                         }
@@ -285,7 +285,7 @@ namespace Newtonsoft.Json.Linq
         {
             get
             {
-                ValidationUtils.ArgumentNotNull(key, "o");
+                ValidationUtils.ArgumentNotNull(key, nameof(key));
 
                 string propertyName = key as string;
                 if (propertyName == null)
@@ -297,7 +297,7 @@ namespace Newtonsoft.Json.Linq
             }
             set
             {
-                ValidationUtils.ArgumentNotNull(key, "o");
+                ValidationUtils.ArgumentNotNull(key, nameof(key));
 
                 string propertyName = key as string;
                 if (propertyName == null)
@@ -317,7 +317,7 @@ namespace Newtonsoft.Json.Linq
         {
             get
             {
-                ValidationUtils.ArgumentNotNull(propertyName, "propertyName");
+                ValidationUtils.ArgumentNotNull(propertyName, nameof(propertyName));
 
                 JProperty property = Property(propertyName);
 
@@ -360,7 +360,7 @@ namespace Newtonsoft.Json.Linq
         /// <returns>A <see cref="JObject"/> that contains the JSON that was read from the specified <see cref="JsonReader"/>.</returns>
         public new static JObject Load(JsonReader reader, JsonLoadSettings settings)
         {
-            ValidationUtils.ArgumentNotNull(reader, "reader");
+            ValidationUtils.ArgumentNotNull(reader, nameof(reader));
 
             if (reader.TokenType == JsonToken.None)
             {
@@ -370,10 +370,7 @@ namespace Newtonsoft.Json.Linq
                 }
             }
 
-            while (reader.TokenType == JsonToken.Comment)
-            {
-                reader.Read();
-            }
+            reader.MoveToContent();
 
             if (reader.TokenType != JsonToken.StartObject)
             {
